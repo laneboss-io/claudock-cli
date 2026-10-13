@@ -1,0 +1,67 @@
+# Managed by Claudock. Change shell integration in Claudock Settings.
+# Adapter v4: managed profile shortcuts without account routing.
+function claudock() {
+  command {{CLI}} "$@"
+}
+
+function _claudock_sync_profiles() {
+  emulate -L zsh
+  setopt no_aliases
+  local _claudock_output
+  _claudock_output=$(command {{CLI}} shell profile-names 2>/dev/null) || return 0
+  local -a _claudock_lines _claudock_names
+  _claudock_lines=("${(@f)_claudock_output}")
+  [[ "${_claudock_lines[1]-}" == 'claudock-profile-names-v1' ]] || return 0
+  _claudock_names=("${_claudock_lines[@]:1}")
+  (( ${#_claudock_names} <= 1000 )) || return 0
+  local -A _claudock_seen
+  local _claudock_name _claudock_suffix
+  # Validate the entire data batch before changing any existing shortcut.
+  for _claudock_name in "${_claudock_names[@]}"; do
+    case "$_claudock_name" in
+      claude-*) _claudock_suffix=${_claudock_name#claude-} ;;
+      codex-*) _claudock_suffix=${_claudock_name#codex-} ;;
+      *) return 0 ;;
+    esac
+    (( ${#_claudock_suffix} >= 1 && ${#_claudock_suffix} <= 40 )) || return 0
+    [[ "$_claudock_suffix" != *[^A-Za-z0-9_-]* ]] || return 0
+    (( ! ${+_claudock_seen[$_claudock_name]} )) || return 0
+    _claudock_seen[$_claudock_name]=1
+  done
+  # Forget user replacements; remove only exact bodies installed by us.
+  for _claudock_name in "${(@k)_claudock_profile_bodies}"; do
+    if [[ "${functions[$_claudock_name]-}" != "${_claudock_profile_bodies[$_claudock_name]}" ]]; then
+      unset "_claudock_profile_bodies[$_claudock_name]"
+    elif (( ! ${+_claudock_seen[$_claudock_name]} )); then
+      builtin unfunction "$_claudock_name"
+      unset "_claudock_profile_bodies[$_claudock_name]"
+    fi
+  done
+  local _claudock_prefix={{PREFIX}}
+  for _claudock_name in "${_claudock_names[@]}"; do
+    # A registered profile reserves this name, including imported ones.
+    # Keep existing v2/user wrappers; explicit claudock run still works.
+    [[ "$_claudock_name" == claude-auto ]] && continue
+    if (( ! ${+_claudock_profile_bodies[$_claudock_name]} )) && builtin whence -w -- "$_claudock_name" >/dev/null 2>&1; then
+      continue
+    fi
+    functions[$_claudock_name]="${_claudock_prefix}'${_claudock_name}' -- \"\$@\""
+    _claudock_profile_bodies[$_claudock_name]="${functions[$_claudock_name]}"
+  done
+  return 0
+}
+
+() {
+  emulate -L zsh
+  setopt no_aliases
+  typeset -gA _claudock_profile_bodies
+  # Retire the v3 shortcut only while its body is still ours.
+  if [[ -n "${_claudock_auto_body-}" && "${functions[claude-auto]-}" == "$_claudock_auto_body" ]]; then
+    builtin unfunction claude-auto
+  fi
+  unset _claudock_auto_body
+  autoload -Uz add-zsh-hook
+  add-zsh-hook precmd _claudock_sync_profiles
+  add-zsh-hook preexec _claudock_sync_profiles
+  _claudock_sync_profiles
+}
