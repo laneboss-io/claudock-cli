@@ -49,6 +49,26 @@ The file-backend tests do not access Keychain. Native Keychain integration needs
 verification. OAuth refresh persistence is available through the store API; the profile-command
 inventory above describes command behavior rather than the complete refresh lifecycle.
 
+## Release version checks
+
+`tests/usage/TestVersion` invokes the built binary with both `version` and
+`--version`, checks the exact release string and exit status, and refuses
+credential changes, registry changes, API requests, or new usage state.
+`TestVersionHelp` checks the same version in every root help form, preserving
+profile data and avoiding API requests. The usage HTTP fixture also checks
+that the User-Agent uses the release version.
+
+On Linux, first demonstrate the version checks failing against the original
+command scaffold, which prints a development version and lacks `--version`
+and help. A compilation or fixture setup failure is not a valid result:
+
+```sh
+CLAUDOCK_USAGE_BASELINE=1 CGO_ENABLED=0 \
+  go test -count=1 -run '^TestVersion' ./tests/usage
+```
+
+Then run `go test -count=1 ./...` against the current implementation.
+
 ## Security regressions
 
 `internal/launch/security_test.go` covers a stale swap-endpoint override in a normal build, private

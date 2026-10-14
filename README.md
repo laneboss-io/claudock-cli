@@ -8,6 +8,75 @@ It shares profile and credential formats with the Swift app in
 [laneboss-io/claudock](https://github.com/laneboss-io/claudock). Black-box tests exercise the built binary
 with isolated registries, file credentials and temporary vendor programs.
 
+## Install
+
+Download the `0.1.0` release for macOS or Linux on amd64 or arm64, verify the
+archive against the release's `SHA256SUMS`, and install it in `~/.local/bin`.
+The commands below require `curl`, `tar`, and either `sha256sum` or `shasum`.
+Run them in a POSIX shell:
+
+```sh
+(
+  set -eu
+  case "$(uname -s)" in
+    Linux) release_os=linux ;;
+    Darwin) release_os=darwin ;;
+    *) printf 'Unsupported operating system.\n' >&2; exit 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64) release_arch=amd64 ;;
+    aarch64|arm64) release_arch=arm64 ;;
+    *) printf 'Unsupported architecture.\n' >&2; exit 1 ;;
+  esac
+  asset="claudock_0.1.0_${release_os}_${release_arch}.tar.gz"
+  base=https://github.com/laneboss-io
+  base=$base/claudock-cli/releases/download
+  base=$base/v0.1.0
+  install_tmp=$(mktemp -d)
+  trap 'rm -rf -- "$install_tmp"' EXIT
+  cd "$install_tmp"
+  curl --fail --location --proto '=https' --proto-redir '=https' \
+    "$base/$asset" --output "$asset"
+  curl --fail --location --proto '=https' --proto-redir '=https' \
+    "$base/SHA256SUMS" --output SHA256SUMS
+  awk -v asset="$asset" '
+    $2 == asset { print; found++ }
+    END { if (found != 1) exit 1 }
+  ' SHA256SUMS > CHECKSUM
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum --check CHECKSUM
+  else
+    shasum -a 256 --check CHECKSUM
+  fi
+  tar -xzf "$asset" claudock
+  mkdir -p "$HOME/.local/bin"
+  install -m 0755 claudock "$HOME/.local/bin/claudock"
+)
+```
+
+Add `~/.local/bin` to your shell's `PATH` if needed, then run
+`claudock --version`. It prints `Claudock 0.1.0`. Install Claude Code separately
+to use `claudock run`.
+
+To install from source with Go 1.24 or newer:
+
+```sh
+git clone https://github.com/laneboss-io/claudock-cli
+cd claudock-cli
+mkdir -p "$HOME/.local/bin"
+CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+  -o "$HOME/.local/bin/claudock" ./cmd/claudock
+```
+
+Release maintainers can run `scripts/release.sh 0.1.0 dist/0.1.0` from a clean
+checkout. It requires Go, GNU tar (`tar` or `gtar`), gzip, and `sha256sum`,
+and creates four archives plus `SHA256SUMS`. Each archive contains `claudock`,
+`LICENSE`, and `README.md`. Use a fresh output directory outside the checkout
+or ignored by Git. The script checks the version against the code, builds a
+committed source snapshot with CGO disabled, removes build paths and the Go
+build ID, and fixes archive timestamps, ownership, permissions, and gzip
+metadata. Repeat builds with the same Go toolchain produce the same assets.
+
 The launch implementation provides:
 
 ```text

@@ -21,6 +21,9 @@ func main() {
 		os.Exit(status)
 	}
 	if len(os.Args) == 1 || (len(os.Args) == 2 && (os.Args[1] == "help" || os.Args[1] == "--help" || os.Args[1] == "-h")) {
+		fmt.Println("Claudock " + usage.Version)
+		fmt.Println("  claudock --version")
+		fmt.Println()
 		fmt.Print(profilecmd.Help)
 		return
 	}

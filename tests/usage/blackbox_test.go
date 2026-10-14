@@ -134,7 +134,7 @@ func newFixture(t *testing.T) *fixture {
 	note := "fixture default profile is unresolved"
 	f.profiles = []testProfile{{Command: "claude", RegistryID: "00000000-0000-4000-8000-000000000001", ConfigDirectory: "", DiscoveryNote: &note}}
 	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/oauth/usage" || r.Header.Get("anthropic-beta") != "oauth-2025-04-20" || r.Header.Get("Accept") != "application/json" || r.Header.Get("User-Agent") != "Claudock/1.7.0" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/oauth/usage" || r.Header.Get("anthropic-beta") != "oauth-2025-04-20" || r.Header.Get("Accept") != "application/json" || r.Header.Get("User-Agent") != "Claudock/0.1.0" {
 			t.Error("remote request method, path, or protocol headers did not match the usage API")
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -423,9 +423,43 @@ func TestVersion(t *testing.T) {
 			f := newFixture(t)
 			writeFile(t, filepath.Join(f.base, "profiles.json"), []byte("invalid registry"))
 			before := readFile(t, f.store)
-			expect(t, f.run(command), 0, "Claudock 1.7.0\n", "")
+			expect(t, f.run(command), 0, "Claudock 0.1.0\n", "")
 			if !bytes.Equal(before, readFile(t, f.store)) || f.requestCount() != 0 {
 				t.Error("version touched credentials or requested an API")
+			}
+			if string(readFile(t, filepath.Join(f.base, "profiles.json"))) != "invalid registry" {
+				t.Error("version changed the registry")
+			}
+			if _, err := os.Lstat(filepath.Join(f.base, "usage-cache.json")); !os.IsNotExist(err) {
+				t.Error("version created usage state")
+			}
+		})
+	}
+}
+
+func TestVersionHelp(t *testing.T) {
+	for _, arguments := range [][]string{nil, {"help"}, {"--help"}, {"-h"}} {
+		name := strings.Join(arguments, " ")
+		if name == "" {
+			name = "no-arguments"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			registry := filepath.Join(f.base, "profiles.json")
+			writeFile(t, registry, []byte("invalid registry"))
+			before := readFile(t, f.store)
+			got := f.run(arguments...)
+			if got.code != 0 || got.err != "" {
+				t.Errorf("help status = %d, stderr = %q", got.code, got.err)
+			}
+			if !strings.HasPrefix(got.out, "Claudock 0.1.0\n") ||
+				!strings.Contains(got.out, "  claudock --version\n") ||
+				!strings.Contains(got.out, "Profile commands:\n") {
+				t.Error("help omitted the release version or command syntax")
+			}
+			if !bytes.Equal(before, readFile(t, f.store)) ||
+				string(readFile(t, registry)) != "invalid registry" || f.requestCount() != 0 {
+				t.Error("help changed profile data or requested an API")
 			}
 		})
 	}

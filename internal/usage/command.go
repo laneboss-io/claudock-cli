@@ -17,7 +17,8 @@ import (
 	"github.com/laneboss-io/claudock-cli/internal/store"
 )
 
-const Version = "1.7.0"
+// Version is the CLI release version, also checked by scripts/release.sh.
+const Version = "0.1.0"
 
 // Run validates the whole command before any registry or credential read.
 // Unhandled commands return false so the other command lanes can dispatch them.
