@@ -60,7 +60,7 @@ func profileID(profile store.Profile, meta profileMetadata) string {
 	if meta.RegistryID != "" {
 		return meta.RegistryID
 	}
-	return profile.Command
+	return profile.ID()
 }
 
 type creditRequest struct {

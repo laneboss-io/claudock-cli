@@ -23,6 +23,8 @@ type command struct {
 	kind            store.Kind
 	endpoint        string
 	model           string
+	project         string
+	region          string
 	behavesAs       string
 	changeBehavesAs bool
 	expiry          *time.Time
@@ -43,7 +45,7 @@ func parse(args []string) (command, error) {
 		}
 	case "add":
 		if len(args) < 2 {
-			return c, errors.New("use profile add NAME [--api-key | --console | --codex | --endpoint URL --model MODEL] [--directory PATH]")
+			return c, errors.New("use profile add NAME [--api-key | --console | --codex | --endpoint URL --model MODEL | --vertex --project ID --region REGION] [--directory PATH]")
 		}
 		c.name = args[1]
 		if err := store.ValidateName(c.name); err != nil {
@@ -59,9 +61,9 @@ func parse(args []string) (command, error) {
 			}
 			seen[option] = true
 			switch option {
-			case "--api-key", "--console", "--codex", "--endpoint":
+			case "--api-key", "--console", "--codex", "--endpoint", "--vertex":
 				if selected {
-					return c, errors.New("choose only one of --api-key, --console, --codex or --endpoint")
+					return c, errors.New("choose only one of --api-key, --console, --codex, --endpoint or --vertex")
 				}
 				selected = true
 				if option == "--api-key" {
@@ -73,6 +75,9 @@ func parse(args []string) (command, error) {
 				if option == "--codex" {
 					c.kind = store.Codex
 				}
+				if option == "--vertex" {
+					c.kind = store.Vertex
+				}
 				if option == "--endpoint" {
 					c.kind = store.Endpoint
 					index++
@@ -81,7 +86,7 @@ func parse(args []string) (command, error) {
 					}
 					c.endpoint = args[index]
 				}
-			case "--directory", "--model", "--behaves-as":
+			case "--directory", "--model", "--behaves-as", "--project", "--region":
 				index++
 				if index >= len(args) {
 					return c, errors.New("profile option needs a value")
@@ -95,12 +100,25 @@ func parse(args []string) (command, error) {
 				if option == "--model" {
 					c.model = args[index]
 				}
+				if option == "--project" {
+					c.project = args[index]
+				}
+				if option == "--region" {
+					c.region = args[index]
+				}
 				if option == "--behaves-as" {
 					c.behavesAs = args[index]
 				}
 			default:
 				return c, errors.New("unknown profile add option; keys and tokens are read from standard input")
 			}
+		}
+		if c.kind == store.Vertex {
+			if err := store.ValidateVertex(store.VertexConfiguration{Project: c.project, Region: c.region}); err != nil {
+				return c, err
+			}
+		} else if seen["--project"] || seen["--region"] {
+			return c, errors.New("--project and --region require --vertex")
 		}
 		if c.kind == store.Endpoint {
 			if c.model == "" {
@@ -258,6 +276,8 @@ func profileKind(p store.Profile) string {
 		return "console-login"
 	case store.Endpoint:
 		return "endpoint"
+	case store.Vertex:
+		return "vertex"
 	case store.Codex:
 		return "codex"
 	}
@@ -325,7 +345,7 @@ func diagnostic(c command, args []string, err error) string {
 			continue
 		}
 		switch arg {
-		case "--api-key", "--console", "--codex", "--endpoint", "--model", "--behaves-as", "--directory", "--expires":
+		case "--api-key", "--console", "--codex", "--endpoint", "--vertex", "--project", "--region", "--model", "--behaves-as", "--directory", "--expires":
 			option = arg
 		}
 	}
@@ -350,6 +370,9 @@ func execute(c *command, in io.Reader, out, stderr io.Writer) (int, error) {
 					endpoint += " · behaves as " + p.Endpoint.BehavesAs
 				}
 			}
+			if p.Vertex != nil {
+				endpoint = p.Vertex.Project + " · " + p.Vertex.Region
+			}
 			fmt.Fprintf(out, "%s\t%s\t%s\t%s\t%s\n", field(p.Name), field(p.Command), profileKind(p), field(p.ConfigDirectory), field(endpoint))
 		}
 		return 0, nil
@@ -364,6 +387,9 @@ func execute(c *command, in io.Reader, out, stderr io.Writer) (int, error) {
 		options := store.AddOptions{Name: c.name, Directory: c.directory, Kind: c.kind}
 		if c.kind == store.Endpoint {
 			options.Endpoint = &store.EndpointConfiguration{BaseURL: c.endpoint, Model: c.model, BehavesAs: c.behavesAs}
+		}
+		if c.kind == store.Vertex {
+			options.Vertex = &store.VertexConfiguration{Project: c.project, Region: c.region}
 		}
 		if c.kind == store.APIKey || c.kind == store.Endpoint {
 			raw, err := readSecretInput(in, stderr)
@@ -387,6 +413,8 @@ func execute(c *command, in io.Reader, out, stderr io.Writer) (int, error) {
 			return launchLogin(p, true, false, in, out, stderr)
 		case store.Codex:
 			fmt.Fprintf(out, "Added %s with its own CODEX_HOME directory: %s\n", p.Name, field(p.ConfigDirectory))
+		case store.Vertex:
+			fmt.Fprintf(out, "Added %s for Google Cloud project %s, region %s. Configure Application Default Credentials; set a local estimated budget with: claudock profile set-credit %s AMOUNT\n", p.Name, p.Vertex.Project, p.Vertex.Region, p.Name)
 		default:
 			fmt.Fprintf(out, "Added %s. Sign in with: claudock profile login %s\n", p.Name, p.Name)
 		}
@@ -464,7 +492,11 @@ func execute(c *command, in io.Reader, out, stderr io.Writer) (int, error) {
 		if err != nil {
 			return 1, err
 		}
-		fmt.Fprintf(out, "Set %s's Console credit to $%s as of %s.\n", p.Name, c.credit, at.Format(time.RFC3339))
+		if p.Kind == store.Vertex {
+			fmt.Fprintf(out, "Set %s's local Vertex budget to $%s as of %s. Go CLI launches do not update this estimate; it does not enforce a Google Cloud quota or spending cap.\n", p.Name, c.credit, at.Format(time.RFC3339))
+		} else {
+			fmt.Fprintf(out, "Set %s's Console credit to $%s as of %s.\n", p.Name, c.credit, at.Format(time.RFC3339))
+		}
 	case "set-token":
 		if p.Kind != store.Subscription || p.DiscoveryNote != "" || p.IsVertex {
 			return 1, errors.New("inference tokens belong only to supported subscription profiles")
@@ -529,6 +561,7 @@ const Help = `Profile commands:
   claudock profile add NAME [--directory ABS_PATH]
   claudock profile add NAME --api-key [--directory ABS_PATH]
   claudock profile add NAME --console [--directory ABS_PATH]
+  claudock profile add NAME --vertex --project PROJECT_ID --region REGION [--directory ABS_PATH]
   claudock profile add NAME --endpoint URL --model MODEL [--behaves-as CATALOG_MODEL]
   claudock profile add NAME --codex [--directory ABS_PATH]
   claudock profile set-key NAME

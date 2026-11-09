@@ -5,7 +5,7 @@ the command and its exit status. The command entry point dispatches the other
 profile and usage commands separately.
 
 Launches read profiles and credentials through `internal/store`. Subscription,
-Console and Codex runs use direct exec, preserving the vendor's terminal,
+Console, Vertex and Codex runs use direct exec, preserving the vendor's terminal,
 working directory, arguments, exit status and signals. Endpoint runs retain a
 parent process to supervise the vendor and remove private settings after exit.
 The child inherits standard input, output, error and working directory.
@@ -20,7 +20,9 @@ Termination signals addressed to the parent are forwarded to the child.
 | `oauth` | Profile swap | Extracted OAuth access token. |
 
 `store.ErrNoSecret` means a missing optional item. Invalid or unavailable storage
-is refused. Backend error details are not interpolated into launch diagnostics.
+is refused. Vertex launches use Google Application Default Credentials, with the
+project and region from the shared profile. Backend error details are not
+interpolated into launch diagnostics.
 Inference binding and expiry are checked before launch; an expired browser
 token can fall back to normal login only when the shared token policy allows it.
 Run uses `internal/policy.Required()`, the same backend and integer rules as
@@ -50,7 +52,7 @@ build requires a loopback HTTP endpoint and explicit file credentials.
 
 ## Known limits
 
-Console spend capture, endpoint MDM plist validation and `behavesAs` mapping
+Console and Vertex spend capture, endpoint MDM plist validation and `behavesAs` mapping
 remain incomplete. An existing MDM policy causes endpoint launch refusal.
 Resume checks cover readable transcripts and resolved session IDs; interactive,
 remote and some path-resolution cases remain partial. Pasted inference tokens

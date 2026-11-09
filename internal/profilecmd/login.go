@@ -51,6 +51,8 @@ func launchLogin(p store.Profile, console, setup bool, in io.Reader, out, stderr
 		arguments = []string{"auth", "login", "--console"}
 	case store.Endpoint:
 		return 1, errors.New("endpoint profiles use their provider key and have no Claude sign-in")
+	case store.Vertex:
+		return 1, errors.New("Vertex profiles use Google Application Default Credentials; configure them outside Claudock")
 	case store.Codex:
 		if console {
 			return 1, errors.New("Codex profiles do not have an Anthropic Console sign-in")

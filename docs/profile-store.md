@@ -21,8 +21,8 @@ the file override is absent. These overrides allow isolated tests and explicit m
 `profiles.json` is the Swift format, with `version`, `profiles`, `suppressedCommands`,
 `suppressedDirectories` and `subscriptionOnlyMigration`. Each record stores `command`,
 `configDirectory`, `isVertex`, `managed`, `registryID`, optional `discoveryNote`, optional `authKind`
-and optional `endpoint`. Subscription records omit `authKind`. Console records require registry version
-2; endpoint records require version 3. The default placeholder is present exactly once. The UUID,
+and optional `endpoint` or `vertex`. Subscription records omit `authKind`. Console records require registry version
+2; endpoint records require version 3; Vertex records require version 4 and store the Google Cloud project and region. The default placeholder is present exactly once. The UUID,
 literal config path and credential service stay unchanged on rename. Removal writes tombstones and
 never deletes account data, credentials or shell files. Unknown registry and profile fields survive
 mutations.
