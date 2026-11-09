@@ -220,6 +220,13 @@ func credentialEnvironment(p store.Profile, args []string, env map[string]string
 		env["CLAUDE_CODE_USE_VERTEX"] = "1"
 		env["ANTHROPIC_VERTEX_PROJECT_ID"] = p.Vertex.Project
 		env["CLOUD_ML_REGION"] = p.Vertex.Region
+		if p.Vertex.ADC != "" {
+			info, statErr := os.Stat(p.Vertex.ADC)
+			if statErr != nil || !info.Mode().IsRegular() {
+				return fmt.Errorf("%s: the Application Default Credentials file is not readable", p.Name)
+			}
+			env["GOOGLE_APPLICATION_CREDENTIALS"] = p.Vertex.ADC
+		}
 	case store.APIKey, store.ConsoleLogin:
 		if !p.Managed {
 			return fmt.Errorf("%s: Console profiles must be managed by Claudock", p.Name)

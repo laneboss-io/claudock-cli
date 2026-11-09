@@ -134,7 +134,7 @@ func newFixture(t *testing.T) *fixture {
 	note := "fixture default profile is unresolved"
 	f.profiles = []testProfile{{Command: "claude", RegistryID: "00000000-0000-4000-8000-000000000001", ConfigDirectory: "", DiscoveryNote: &note}}
 	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/oauth/usage" || r.Header.Get("anthropic-beta") != "oauth-2025-04-20" || r.Header.Get("Accept") != "application/json" || r.Header.Get("User-Agent") != "Claudock/0.1.0" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/oauth/usage" || r.Header.Get("anthropic-beta") != "oauth-2025-04-20" || r.Header.Get("Accept") != "application/json" || r.Header.Get("User-Agent") != "Claudock/0.2.0" {
 			t.Error("remote request method, path, or protocol headers did not match the usage API")
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -423,7 +423,7 @@ func TestVersion(t *testing.T) {
 			f := newFixture(t)
 			writeFile(t, filepath.Join(f.base, "profiles.json"), []byte("invalid registry"))
 			before := readFile(t, f.store)
-			expect(t, f.run(command), 0, "Claudock 0.1.0\n", "")
+			expect(t, f.run(command), 0, "Claudock 0.2.0\n", "")
 			if !bytes.Equal(before, readFile(t, f.store)) || f.requestCount() != 0 {
 				t.Error("version touched credentials or requested an API")
 			}
@@ -452,7 +452,7 @@ func TestVersionHelp(t *testing.T) {
 			if got.code != 0 || got.err != "" {
 				t.Errorf("help status = %d, stderr = %q", got.code, got.err)
 			}
-			if !strings.HasPrefix(got.out, "Claudock 0.1.0\n") ||
+			if !strings.HasPrefix(got.out, "Claudock 0.2.0\n") ||
 				!strings.Contains(got.out, "  claudock --version\n") ||
 				!strings.Contains(got.out, "Profile commands:\n") {
 				t.Error("help omitted the release version or command syntax")

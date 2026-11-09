@@ -6,6 +6,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
@@ -59,6 +60,7 @@ type EndpointConfiguration struct {
 type VertexConfiguration struct {
 	Project string `json:"project"`
 	Region  string `json:"region"`
+	ADC     string `json:"adc,omitempty"`
 }
 
 var vertexProjectPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
@@ -67,6 +69,9 @@ var vertexRegionPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 func ValidateVertex(v VertexConfiguration) error {
 	if !vertexProjectPattern.MatchString(v.Project) || len(v.Region) > 63 || !vertexRegionPattern.MatchString(v.Region) {
 		return errors.New("enter a valid Google Cloud project ID and Vertex region, such as my-project and us-east5")
+	}
+	if v.ADC != "" && (len(v.ADC) > 4096 || !filepath.IsAbs(v.ADC) || strings.ContainsRune(v.ADC, 0)) {
+		return errors.New("the Application Default Credentials path must be absolute")
 	}
 	return nil
 }

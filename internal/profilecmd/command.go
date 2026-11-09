@@ -24,6 +24,7 @@ type command struct {
 	endpoint        string
 	model           string
 	project         string
+	adc             string
 	region          string
 	behavesAs       string
 	changeBehavesAs bool
@@ -45,7 +46,7 @@ func parse(args []string) (command, error) {
 		}
 	case "add":
 		if len(args) < 2 {
-			return c, errors.New("use profile add NAME [--api-key | --console | --codex | --endpoint URL --model MODEL | --vertex --project ID --region REGION] [--directory PATH]")
+			return c, errors.New("use profile add NAME [--api-key | --console | --codex | --endpoint URL --model MODEL | --vertex --project ID --region REGION [--adc PATH]] [--directory PATH]")
 		}
 		c.name = args[1]
 		if err := store.ValidateName(c.name); err != nil {
@@ -86,7 +87,7 @@ func parse(args []string) (command, error) {
 					}
 					c.endpoint = args[index]
 				}
-			case "--directory", "--model", "--behaves-as", "--project", "--region":
+			case "--directory", "--model", "--behaves-as", "--project", "--region", "--adc":
 				index++
 				if index >= len(args) {
 					return c, errors.New("profile option needs a value")
@@ -106,6 +107,9 @@ func parse(args []string) (command, error) {
 				if option == "--region" {
 					c.region = args[index]
 				}
+				if option == "--adc" {
+					c.adc = args[index]
+				}
 				if option == "--behaves-as" {
 					c.behavesAs = args[index]
 				}
@@ -114,11 +118,11 @@ func parse(args []string) (command, error) {
 			}
 		}
 		if c.kind == store.Vertex {
-			if err := store.ValidateVertex(store.VertexConfiguration{Project: c.project, Region: c.region}); err != nil {
+			if err := store.ValidateVertex(store.VertexConfiguration{Project: c.project, Region: c.region, ADC: c.adc}); err != nil {
 				return c, err
 			}
-		} else if seen["--project"] || seen["--region"] {
-			return c, errors.New("--project and --region require --vertex")
+		} else if seen["--project"] || seen["--region"] || seen["--adc"] {
+			return c, errors.New("--project, --region and --adc require --vertex")
 		}
 		if c.kind == store.Endpoint {
 			if c.model == "" {
@@ -389,7 +393,7 @@ func execute(c *command, in io.Reader, out, stderr io.Writer) (int, error) {
 			options.Endpoint = &store.EndpointConfiguration{BaseURL: c.endpoint, Model: c.model, BehavesAs: c.behavesAs}
 		}
 		if c.kind == store.Vertex {
-			options.Vertex = &store.VertexConfiguration{Project: c.project, Region: c.region}
+			options.Vertex = &store.VertexConfiguration{Project: c.project, Region: c.region, ADC: c.adc}
 		}
 		if c.kind == store.APIKey || c.kind == store.Endpoint {
 			raw, err := readSecretInput(in, stderr)
@@ -561,7 +565,7 @@ const Help = `Profile commands:
   claudock profile add NAME [--directory ABS_PATH]
   claudock profile add NAME --api-key [--directory ABS_PATH]
   claudock profile add NAME --console [--directory ABS_PATH]
-  claudock profile add NAME --vertex --project PROJECT_ID --region REGION [--directory ABS_PATH]
+  claudock profile add NAME --vertex --project PROJECT_ID --region REGION [--adc ABS_PATH] [--directory ABS_PATH]
   claudock profile add NAME --endpoint URL --model MODEL [--behaves-as CATALOG_MODEL]
   claudock profile add NAME --codex [--directory ABS_PATH]
   claudock profile set-key NAME

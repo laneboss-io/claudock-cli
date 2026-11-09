@@ -10,7 +10,7 @@ with isolated registries, file credentials and temporary vendor programs.
 
 ## Install
 
-Download the `0.1.0` release for macOS or Linux on amd64 or arm64, verify the
+Download the `0.2.0` release for macOS or Linux on amd64 or arm64, verify the
 archive against the release's `SHA256SUMS`, and install it in `~/.local/bin`.
 The commands below require `curl`, `tar`, and either `sha256sum` or `shasum`.
 Run them in a POSIX shell:
@@ -28,10 +28,10 @@ Run them in a POSIX shell:
     aarch64|arm64) release_arch=arm64 ;;
     *) printf 'Unsupported architecture.\n' >&2; exit 1 ;;
   esac
-  asset="claudock_0.1.0_${release_os}_${release_arch}.tar.gz"
+  asset="claudock_0.2.0_${release_os}_${release_arch}.tar.gz"
   base=https://github.com/laneboss-io
   base=$base/claudock-cli/releases/download
-  base=$base/v0.1.0
+  base=$base/v0.2.0
   install_tmp=$(mktemp -d)
   trap 'rm -rf -- "$install_tmp"' EXIT
   cd "$install_tmp"
@@ -55,7 +55,7 @@ Run them in a POSIX shell:
 ```
 
 Add `~/.local/bin` to your shell's `PATH` if needed, then run
-`claudock --version`. It prints `Claudock 0.1.0`. Install Claude Code separately
+`claudock --version`. It prints `Claudock 0.2.0`. Install Claude Code separately
 to use `claudock run`.
 
 To install from source with Go 1.24 or newer:
@@ -68,7 +68,7 @@ CGO_ENABLED=0 go build -trimpath -buildvcs=false \
   -o "$HOME/.local/bin/claudock" ./cmd/claudock
 ```
 
-Release maintainers can run `scripts/release.sh 0.1.0 dist/0.1.0` from a clean
+Release maintainers can run `scripts/release.sh 0.2.0 dist/0.2.0` from a clean
 checkout. It requires Go, GNU tar (`tar` or `gtar`), gzip, and `sha256sum`,
 and creates four archives plus `SHA256SUMS`. Each archive contains `claudock`,
 `LICENSE`, and `README.md`. Use a fresh output directory outside the checkout
