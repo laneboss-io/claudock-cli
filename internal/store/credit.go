@@ -170,3 +170,106 @@ func creditDate(raw json.RawMessage) bool {
 	_, err := time.Parse(time.RFC3339Nano, text)
 	return err == nil
 }
+
+// CreditRequest is one Claude Code API request with the cost Claude Code
+// reported for it. It holds no prompt, response, or credential.
+type CreditRequest struct {
+	ID        string
+	SessionID string
+	At        time.Time
+	CostUSD   float64
+	Model     *string
+}
+
+// RecordCredit appends requests not seen before and not older than the
+// profile's asOf to its account in the credit ledger and returns how many it
+// added. Without a ledger or an account for the profile nothing is stored.
+func RecordCredit(p Profile, requests []CreditRequest) (int, error) {
+	if len(requests) == 0 {
+		return 0, nil
+	}
+	base, err := Directory()
+	if err != nil {
+		return 0, err
+	}
+	path := filepath.Join(base, "api-credit.json")
+	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	added := 0
+	err = withLock(filepath.Join(base, ".api-credit-lock"), true, func() error {
+		data, err := readOptional(path, 32*maximumCredentialBytes, false)
+		if err != nil {
+			return errors.New("credit ledger is unavailable or unsafe")
+		}
+		if data == nil {
+			return nil
+		}
+		var root, profiles, account map[string]json.RawMessage
+		var version int
+		if decodeJSON(data, &root) != nil || root == nil || json.Unmarshal(root["version"], &version) != nil || version != 1 || json.Unmarshal(root["profiles"], &profiles) != nil || profiles == nil || !validCreditAccounts(profiles) {
+			return errors.New("credit ledger is unreadable")
+		}
+		raw, ok := profiles[p.ID()]
+		if !ok {
+			return nil
+		}
+		var asOfText string
+		var stored []json.RawMessage
+		if decodeJSON(raw, &account) != nil || json.Unmarshal(account["asOf"], &asOfText) != nil || decodeJSON(account["requests"], &stored) != nil {
+			return errors.New("credit ledger is unreadable")
+		}
+		asOf, err := time.Parse(time.RFC3339Nano, asOfText)
+		if err != nil {
+			return errors.New("credit ledger is unreadable")
+		}
+		known := make(map[string]bool, len(stored))
+		for _, entry := range stored {
+			var request struct {
+				ID string `json:"id"`
+			}
+			_ = json.Unmarshal(entry, &request)
+			known[request.ID] = true
+		}
+		for _, request := range requests {
+			if request.At.Before(asOf) || known[request.ID] || math.IsNaN(request.CostUSD) || math.IsInf(request.CostUSD, 0) || request.CostUSD < 0 {
+				continue
+			}
+			entry := map[string]any{"id": request.ID, "sessionID": request.SessionID, "at": request.At.UTC().Format("2006-01-02T15:04:05.000Z"), "costUSD": request.CostUSD}
+			if request.Model != nil {
+				entry["model"] = *request.Model
+			}
+			encoded, err := json.Marshal(entry)
+			if err != nil {
+				return errors.New("could not encode a credit request")
+			}
+			stored = append(stored, encoded)
+			known[request.ID] = true
+			added++
+		}
+		if added == 0 {
+			return nil
+		}
+		if account["requests"], err = json.Marshal(stored); err != nil {
+			return errors.New("could not encode credit requests")
+		}
+		if profiles[p.ID()], err = json.Marshal(account); err != nil {
+			return errors.New("could not encode credit ledger")
+		}
+		if root["profiles"], err = json.Marshal(profiles); err != nil {
+			return errors.New("could not encode credit ledger")
+		}
+		encoded, err := json.Marshal(root)
+		if err != nil || len(encoded) > 32*maximumCredentialBytes {
+			return errors.New("credit ledger exceeds its size limit")
+		}
+		if !unchanged(path, data, 32*maximumCredentialBytes) {
+			return errors.New("credit ledger changed while saving")
+		}
+		return atomicWrite(path, append(encoded, '\n'))
+	})
+	if err != nil {
+		added = 0
+	}
+	return added, err
+}

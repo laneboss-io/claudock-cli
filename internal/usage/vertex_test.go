@@ -29,8 +29,8 @@ func TestVertexBudgetReadAndAvailability(t *testing.T) {
 	if !strings.Contains(out.String(), "cloud\tVertex AI\tCredit · $98.75 of $100.00 left\t1.25\t-") {
 		t.Fatalf("usage output %q", out.String())
 	}
-	if !strings.Contains(stderr.String(), "Go CLI launches do not update") {
-		t.Fatal("usage omitted the cost-capture limitation")
+	if strings.Contains(stderr.String(), "do not update") {
+		t.Fatal("usage still reports that launches do not update the budget")
 	}
 	out.Reset()
 	stderr.Reset()
@@ -40,8 +40,8 @@ func TestVertexBudgetReadAndAvailability(t *testing.T) {
 	if !strings.Contains(out.String(), "cloud\tvertex\tVertex AI\t$98.75") {
 		t.Fatalf("available output %q", out.String())
 	}
-	if !strings.Contains(stderr.String(), "Go CLI launches do not update") {
-		t.Fatal("available omitted the cost-capture limitation")
+	if strings.Contains(stderr.String(), "do not update") {
+		t.Fatal("available still reports that launches do not update the budget")
 	}
 }
 

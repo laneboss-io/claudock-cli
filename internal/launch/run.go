@@ -101,7 +101,7 @@ func launchProfile(p store.Profile, args []string, allow bool, errOut io.Writer)
 		fmt.Fprintf(errOut, "claudock: %s: Console spend capture is not yet ported; this run will not update the credit estimate.\n", p.Name)
 	}
 	if p.Kind == store.Vertex {
-		fmt.Fprintf(errOut, "claudock: %s: Vertex spend capture is not yet ported; this run will not update the budget estimate.\n", p.Name)
+		return vertexLaunch(p, executable, args, env, errOut)
 	}
 	if cleanup != nil {
 		return supervisedLaunch(executable, args, environmentList(env))

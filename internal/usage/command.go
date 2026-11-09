@@ -207,7 +207,6 @@ func showUsage(home string, profiles []store.Profile, entries map[string]profile
 				plan := "Console API"
 				if profile.Kind == store.Vertex {
 					plan = "Vertex AI"
-					diagnostic(stderr, profile.Name+": Go CLI launches do not update this local budget estimate.")
 				}
 				row(stdout, profile.Name, plan, credit.usageWindow(), credit.usedPercent(), "-")
 			} else {
@@ -291,7 +290,6 @@ func showAvailable(home string, profiles []store.Profile, entries map[string]pro
 			plan := "Console API"
 			if profile.Kind == store.Vertex {
 				kind, plan = "vertex", "Vertex AI"
-				diagnostic(stderr, profile.Name+": Go CLI launches do not update this local budget estimate.")
 			}
 			rows = append(rows, availableRow{profile: profile, kind: kind, plan: plan, left: credit.leftText(), limit: "Credit", resets: "-", rank: credit.rank()})
 			continue
