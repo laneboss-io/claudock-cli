@@ -497,7 +497,7 @@ func execute(c *command, in io.Reader, out, stderr io.Writer) (int, error) {
 			return 1, err
 		}
 		if p.Kind == store.Vertex {
-			fmt.Fprintf(out, "Set %s's local Vertex budget to $%s as of %s. Go CLI launches do not update this estimate; it does not enforce a Google Cloud quota or spending cap.\n", p.Name, c.credit, at.Format(time.RFC3339))
+			fmt.Fprintf(out, "Set %s's local Vertex budget to $%s as of %s. claudock run subtracts the cost Claude Code reports for each launch; it does not enforce a Google Cloud quota or spending cap.\n", p.Name, c.credit, at.Format(time.RFC3339))
 		} else {
 			fmt.Fprintf(out, "Set %s's Console credit to $%s as of %s.\n", p.Name, c.credit, at.Format(time.RFC3339))
 		}
