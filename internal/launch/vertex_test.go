@@ -54,3 +54,22 @@ func TestVertexConfigRejectsProviderOverrides(t *testing.T) {
 		}
 	}
 }
+
+func TestVertexLaunchUsesProfileADC(t *testing.T) {
+	adc := filepath.Join(t.TempDir(), "adc.json")
+	if err := os.WriteFile(adc, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p := store.Profile{Name: "cloud", Managed: true, Kind: store.Vertex, Vertex: &store.VertexConfiguration{Project: "example-project", Region: "us-east5", ADC: adc}}
+	env := isolatedEnvironment([]string{"GOOGLE_APPLICATION_CREDENTIALS=/tmp/other.json"})
+	if err := credentialEnvironment(p, nil, env); err != nil {
+		t.Fatal(err)
+	}
+	if env["GOOGLE_APPLICATION_CREDENTIALS"] != adc {
+		t.Fatalf("ADC = %q", env["GOOGLE_APPLICATION_CREDENTIALS"])
+	}
+	p.Vertex.ADC = filepath.Join(filepath.Dir(adc), "missing.json")
+	if err := credentialEnvironment(p, nil, env); err == nil {
+		t.Fatal("missing ADC file accepted")
+	}
+}
