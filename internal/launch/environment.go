@@ -150,12 +150,34 @@ func validateConfig(p store.Profile) error {
 					return failure
 				}
 			}
+			if p.Kind == store.Vertex && (key == "CLOUD_ML_REGION" || key == "ANTHROPIC_VERTEX_PROJECT_ID") {
+				text, ok := value.(string)
+				if !ok || p.Vertex == nil || (text != "" && ((key == "CLOUD_ML_REGION" && text != p.Vertex.Region) || (key == "ANTHROPIC_VERTEX_PROJECT_ID" && text != p.Vertex.Project))) {
+					return failure
+				}
+				continue
+			}
 			// Model settings do not select authentication.
 			if strings.Contains(key, "MODEL") || key == "CLOUD_ML_REGION" || key == "ANTHROPIC_VERTEX_PROJECT_ID" {
 				continue
 			}
 			if value != "" {
 				return failure
+			}
+		}
+		if p.Kind == store.Vertex {
+			for key, value := range env {
+				if key == "ANTHROPIC_VERTEX_BASE_URL" || key == "CLAUDE_CODE_SKIP_VERTEX_AUTH" || strings.HasPrefix(key, "VERTEX_REGION_CLAUDE_") {
+					if value != "" {
+						return failure
+					}
+				}
+				if key == "GOOGLE_CLOUD_PROJECT" || key == "CLOUD_ML_PROJECT" {
+					text, ok := value.(string)
+					if !ok || p.Vertex == nil || (text != "" && text != p.Vertex.Project) {
+						return failure
+					}
+				}
 			}
 		}
 	}
@@ -181,6 +203,23 @@ var inferenceShape = regexp.MustCompile("^sk-ant-oat01-[A-Za-z0-9._~+/=-]+$")
 
 func credentialEnvironment(p store.Profile, args []string, env map[string]string) error {
 	switch p.Kind {
+	case store.Vertex:
+		if !p.Managed || p.Vertex == nil || store.ValidateVertex(*p.Vertex) != nil {
+			return fmt.Errorf("%s: invalid managed Vertex configuration", p.Name)
+		}
+		for name := range env {
+			if name == "ANTHROPIC_VERTEX_BASE_URL" || name == "CLAUDE_CODE_SKIP_VERTEX_AUTH" || strings.HasPrefix(name, "VERTEX_REGION_CLAUDE_") {
+				delete(env, name)
+			}
+		}
+		for _, name := range []string{"GOOGLE_CLOUD_PROJECT", "CLOUD_ML_PROJECT"} {
+			if _, exists := env[name]; exists {
+				env[name] = p.Vertex.Project
+			}
+		}
+		env["CLAUDE_CODE_USE_VERTEX"] = "1"
+		env["ANTHROPIC_VERTEX_PROJECT_ID"] = p.Vertex.Project
+		env["CLOUD_ML_REGION"] = p.Vertex.Region
 	case store.APIKey, store.ConsoleLogin:
 		if !p.Managed {
 			return fmt.Errorf("%s: Console profiles must be managed by Claudock", p.Name)

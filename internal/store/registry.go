@@ -177,12 +177,15 @@ func encodeRegistry(state registry, codex bool) ([]byte, error) {
 	if !codex {
 		state.Version = 1
 		for _, p := range state.Profiles {
-			if p.Kind == Endpoint {
-				state.Version = 3
+			if p.Kind == Vertex {
+				state.Version = 4
 				break
 			}
+			if p.Kind == Endpoint {
+				state.Version = max(state.Version, 3)
+			}
 			if p.Kind == APIKey || p.Kind == ConsoleLogin {
-				state.Version = 2
+				state.Version = max(state.Version, 2)
 			}
 		}
 	}
@@ -210,7 +213,7 @@ func encodeRegistry(state registry, codex bool) ([]byte, error) {
 }
 
 func validateRegistry(state registry, codex bool) error {
-	if state.Version < 1 || state.Version > 3 || (codex && state.Version != 1) || len(state.Profiles) > 1000 || len(state.SuppressedCommands) > 10000 || len(state.SuppressedDirectories) > 10000 {
+	if state.Version < 1 || state.Version > 4 || (codex && state.Version != 1) || len(state.Profiles) > 1000 || len(state.SuppressedCommands) > 10000 || len(state.SuppressedDirectories) > 10000 {
 		return ErrInvalidRegistry
 	}
 	ids, commands := map[string]bool{}, map[string]bool{}
@@ -242,11 +245,14 @@ func validateRegistry(state registry, codex bool) error {
 		if (p.Kind == Endpoint) != (p.Endpoint != nil) {
 			return ErrInvalidRegistry
 		}
+		if (p.Kind == Vertex) != (p.Vertex != nil) || (p.Vertex != nil && ValidateVertex(*p.Vertex) != nil) {
+			return ErrInvalidRegistry
+		}
 		if codex {
 			if p.Kind != Codex {
 				return ErrInvalidRegistry
 			}
-		} else if p.Kind != Subscription && p.Kind != APIKey && p.Kind != ConsoleLogin && p.Kind != Endpoint {
+		} else if p.Kind != Subscription && p.Kind != APIKey && p.Kind != ConsoleLogin && p.Kind != Endpoint && p.Kind != Vertex {
 			return ErrInvalidRegistry
 		}
 		if p.Managed && (p.Command == "claude" || p.IsVertex || p.DiscoveryNote != "" || !namePattern.MatchString(profileName(p.Command)) || strings.EqualFold(profileName(p.Command), "default")) {
@@ -338,12 +344,15 @@ func readSnapshot() (*snapshot, error) {
 	s.main.Profiles = kept
 	expectedVersion := 1
 	for _, p := range s.main.Profiles {
-		if p.Kind == Endpoint {
-			expectedVersion = 3
+		if p.Kind == Vertex {
+			expectedVersion = 4
 			break
 		}
+		if p.Kind == Endpoint {
+			expectedVersion = max(expectedVersion, 3)
+		}
 		if p.Kind == APIKey || p.Kind == ConsoleLogin {
-			expectedVersion = 2
+			expectedVersion = max(expectedVersion, 2)
 		}
 	}
 	if s.main.Version != expectedVersion {
@@ -453,6 +462,7 @@ type AddOptions struct {
 	Directory string
 	Kind      Kind
 	Endpoint  *EndpointConfiguration
+	Vertex    *VertexConfiguration
 	Key       string
 }
 
@@ -463,7 +473,7 @@ func Add(options AddOptions) (Profile, error) {
 	if options.Kind == "" {
 		options.Kind = Subscription
 	}
-	if options.Kind != Subscription && options.Kind != APIKey && options.Kind != ConsoleLogin && options.Kind != Endpoint && options.Kind != Codex {
+	if options.Kind != Subscription && options.Kind != APIKey && options.Kind != ConsoleLogin && options.Kind != Endpoint && options.Kind != Vertex && options.Kind != Codex {
 		return Profile{}, errors.New("unsupported profile kind")
 	}
 	if options.Directory != "" {
@@ -486,6 +496,16 @@ func Add(options AddOptions) (Profile, error) {
 		options.Endpoint = &endpoint
 	} else if options.Endpoint != nil {
 		return Profile{}, errors.New("an endpoint belongs only to an endpoint profile")
+	}
+	if options.Kind == Vertex {
+		if options.Vertex == nil {
+			return Profile{}, errors.New("Vertex profiles require a project and region")
+		}
+		if err := ValidateVertex(*options.Vertex); err != nil {
+			return Profile{}, err
+		}
+	} else if options.Vertex != nil {
+		return Profile{}, errors.New("Vertex settings belong only to a Vertex profile")
 	}
 	if options.Kind == APIKey || options.Kind == Endpoint {
 		key, err := ParseKey(options.Key, options.Kind)
@@ -520,7 +540,7 @@ func Add(options AddOptions) (Profile, error) {
 				return errors.New("config path already belongs to a profile")
 			}
 		}
-		result = Profile{Name: options.Name, Command: prefix + options.Name, ConfigDirectory: path, Kind: options.Kind, Managed: true, RegistryID: id, Endpoint: options.Endpoint}
+		result = Profile{Name: options.Name, Command: prefix + options.Name, ConfigDirectory: path, Kind: options.Kind, Managed: true, RegistryID: id, Endpoint: options.Endpoint, Vertex: options.Vertex}
 		if result.Endpoint != nil {
 			result.EndpointURL, result.EndpointModel = result.Endpoint.BaseURL, result.Endpoint.Model
 		}

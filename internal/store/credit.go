@@ -30,8 +30,8 @@ func SetCredit(p Profile, text string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	if p.Kind != APIKey && p.Kind != ConsoleLogin {
-		return time.Time{}, errors.New("credit applies only to Console API-key and Console-login profiles")
+	if p.Kind != APIKey && p.Kind != ConsoleLogin && p.Kind != Vertex {
+		return time.Time{}, errors.New("credit applies only to Console and Vertex profiles")
 	}
 	base, err := Directory()
 	if err != nil {

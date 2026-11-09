@@ -198,17 +198,25 @@ func showUsage(home string, profiles []store.Profile, entries map[string]profile
 		case store.Endpoint:
 			diagnostic(stderr, profile.Name+": "+endpointNote(profile))
 			continue
-		case store.APIKey, store.ConsoleLogin:
+		case store.APIKey, store.ConsoleLogin, store.Vertex:
 			credit, err := readCredit(home, profileID(profile, meta))
 			if err != nil {
 				failed = true
 				diagnostic(stderr, profile.Name+": "+err.Error())
 			} else if credit != nil {
-				row(stdout, profile.Name, "Console API", credit.usageWindow(), credit.usedPercent(), "-")
+				plan := "Console API"
+				if profile.Kind == store.Vertex {
+					plan = "Vertex AI"
+					diagnostic(stderr, profile.Name+": Go CLI launches do not update this local budget estimate.")
+				}
+				row(stdout, profile.Name, plan, credit.usageWindow(), credit.usedPercent(), "-")
 			} else {
 				billing := "Console API key profiles are billed per token and have"
 				if profile.Kind == store.ConsoleLogin {
 					billing = "Console login profiles are billed per token and have"
+				}
+				if profile.Kind == store.Vertex {
+					billing = "Vertex AI profiles are billed by Google Cloud and have"
 				}
 				diagnostic(stderr, profile.Name+": skipped; "+billing+" no subscription limits. Set its balance with: claudock profile set-credit "+profile.Name+" AMOUNT")
 			}
@@ -263,14 +271,14 @@ func showAvailable(home string, profiles []store.Profile, entries map[string]pro
 		case store.Endpoint:
 			diagnostic(stderr, profile.Name+": not listed; "+endpointNote(profile))
 			continue
-		case store.APIKey, store.ConsoleLogin:
+		case store.APIKey, store.ConsoleLogin, store.Vertex:
 			credit, err := readCredit(home, profileID(profile, meta))
 			if err != nil {
 				diagnostic(stderr, profile.Name+": "+err.Error())
 				continue
 			}
 			if credit == nil {
-				diagnostic(stderr, profile.Name+": not listed; set its Console credit to track it: claudock profile set-credit "+profile.Name+" AMOUNT")
+				diagnostic(stderr, profile.Name+": not listed; set its credit or budget to track it: claudock profile set-credit "+profile.Name+" AMOUNT")
 				continue
 			}
 			if credit.left.Sign() <= 0 {
@@ -280,7 +288,12 @@ func showAvailable(home string, profiles []store.Profile, entries map[string]pro
 			if profile.Kind == store.ConsoleLogin {
 				kind = "console-login"
 			}
-			rows = append(rows, availableRow{profile: profile, kind: kind, plan: "Console API", left: credit.leftText(), limit: "Credit", resets: "-", rank: credit.rank()})
+			plan := "Console API"
+			if profile.Kind == store.Vertex {
+				kind, plan = "vertex", "Vertex AI"
+				diagnostic(stderr, profile.Name+": Go CLI launches do not update this local budget estimate.")
+			}
+			rows = append(rows, availableRow{profile: profile, kind: kind, plan: plan, left: credit.leftText(), limit: "Credit", resets: "-", rank: credit.rank()})
 			continue
 		case store.Subscription, "":
 		default:

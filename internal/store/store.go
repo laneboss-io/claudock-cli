@@ -19,6 +19,7 @@ const (
 	APIKey       Kind = "apiKey"
 	ConsoleLogin Kind = "consoleLogin"
 	Endpoint     Kind = "endpoint"
+	Vertex       Kind = "vertex"
 	// Codex is new in the Go CLI: a profile that runs the Codex CLI with its own CODEX_HOME.
 	Codex Kind = "codex"
 )
@@ -36,6 +37,7 @@ type Profile struct {
 	IsVertex        bool                   `json:"isVertex"`
 	DiscoveryNote   string                 `json:"discoveryNote,omitempty"`
 	Endpoint        *EndpointConfiguration `json:"endpoint,omitempty"`
+	Vertex          *VertexConfiguration   `json:"vertex,omitempty"`
 	extra           map[string]json.RawMessage
 }
 
@@ -51,6 +53,22 @@ type EndpointConfiguration struct {
 	BaseURL   string `json:"baseURL"`
 	Model     string `json:"model"`
 	BehavesAs string `json:"behavesAs,omitempty"`
+}
+
+// VertexConfiguration is shared verbatim with the Swift app's version 4 registry.
+type VertexConfiguration struct {
+	Project string `json:"project"`
+	Region  string `json:"region"`
+}
+
+var vertexProjectPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
+var vertexRegionPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+
+func ValidateVertex(v VertexConfiguration) error {
+	if !vertexProjectPattern.MatchString(v.Project) || len(v.Region) > 63 || !vertexRegionPattern.MatchString(v.Region) {
+		return errors.New("enter a valid Google Cloud project ID and Vertex region, such as my-project and us-east5")
+	}
+	return nil
 }
 
 func (p Profile) ID() string {
@@ -118,7 +136,7 @@ func (p *Profile) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &p.extra); err != nil {
 		return err
 	}
-	for _, key := range []string{"command", "configDirectory", "authKind", "managed", "registryID", "isVertex", "discoveryNote", "endpoint"} {
+	for _, key := range []string{"command", "configDirectory", "authKind", "managed", "registryID", "isVertex", "discoveryNote", "endpoint", "vertex"} {
 		delete(p.extra, key)
 	}
 	return nil

@@ -42,7 +42,7 @@ func launchProfile(p store.Profile, args []string, allow bool, errOut io.Writer)
 			return invalid("A vendor argument contains an invalid character.")
 		}
 	}
-	if p.Kind != store.Subscription && p.Kind != store.APIKey && p.Kind != store.ConsoleLogin && p.Kind != store.Endpoint && p.Kind != store.Codex {
+	if p.Kind != store.Subscription && p.Kind != store.APIKey && p.Kind != store.ConsoleLogin && p.Kind != store.Endpoint && p.Kind != store.Vertex && p.Kind != store.Codex {
 		return fmt.Errorf("%s: unsupported profile kind", p.Name)
 	}
 	env := isolatedEnvironment(os.Environ())
@@ -99,6 +99,9 @@ func launchProfile(p store.Profile, args []string, allow bool, errOut io.Writer)
 	}
 	if p.Kind == store.APIKey || p.Kind == store.ConsoleLogin {
 		fmt.Fprintf(errOut, "claudock: %s: Console spend capture is not yet ported; this run will not update the credit estimate.\n", p.Name)
+	}
+	if p.Kind == store.Vertex {
+		fmt.Fprintf(errOut, "claudock: %s: Vertex spend capture is not yet ported; this run will not update the budget estimate.\n", p.Name)
 	}
 	if cleanup != nil {
 		return supervisedLaunch(executable, args, environmentList(env))

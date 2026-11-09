@@ -90,7 +90,7 @@ claudock profile swap --from NAME (--session ID | --continue)
 Run forwards arguments literally. Subscription and Console profiles replace the
 process with Claude Code; endpoint runs supervise the child to clean up their
 private settings file after it exits, preserving its output and exit status.
-Subscription, Console API-key, Console-login, and third-party endpoint profiles
+Subscription, Console API-key, Console-login, Vertex AI, and third-party endpoint profiles
 use their own configuration and credential selection. Endpoint profiles pin the
 model and refuse a checked resumed session with replies from another model unless
 the caller explicitly allows it. A profile whose store kind is `codex` starts
@@ -110,7 +110,7 @@ or opt into Console billing.
 
 Launch and usage tests build against the shared production store. Fixtures use
 the Swift registry format, the companion Codex registry, and the versioned file
-credential backend with the real service identities. Console spend capture,
+credential backend with the real service identities. Console and Vertex spend capture,
 MDM plist validation, and endpoint `behavesAs`
 mapping remain unported. See [the launch notes](internal/launch/README.md) for
 integration details and the verification procedure.
@@ -124,7 +124,7 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o claudock ./cmd/claudock
 
 License: MIT (see [LICENSE](LICENSE)).
 
-The profile commands cover listing, adding subscription/Console/endpoint/Codex profiles, changing keys,
+The profile commands cover listing, adding subscription/Console/Vertex/endpoint/Codex profiles, changing keys,
 endpoints and Console credit, importing and clearing inference tokens, token status, renaming, removing,
 signing in and importing static shell wrappers. `claudock help` lists their syntax.
 
@@ -150,17 +150,29 @@ When a request fails, an older reading is shown with its age on stderr; a
 subscription without any reading makes `usage` exit 1.
 
 `available` sorts subscriptions by room in their tightest governing limit, then
-Console profiles by the share of prepaid credit left. Near-limit profiles are
+Console and Vertex profiles by the share of credit or local budget left. Near-limit profiles are
 included. Full accounts and accounts that need sign-in are excluded. With
 `--names`, stdout contains one profile name per line. No available profile means
 exit 1, with the next known reset on stderr. Third-party endpoints are noted as
 billed per token and have no quota to read. Codex profiles are untracked here.
 
-Console credit is read from the app's existing `api-credit.json`, by registry ID.
+Console credit and Vertex budget estimates are read from the app's existing `api-credit.json`, by registry ID.
 Only requests and session-total adjustments on or after the saved balance time
 count. Reading usage does not change the credit ledger or any credential. Like
 the Swift CLI, these commands do not rotate OAuth tokens: renewal belongs to the
 resident app or Claude Code.
+
+Vertex profiles use Google Application Default Credentials and the same version 4 registry as the Swift app:
+
+```sh
+claudock profile add cloud --vertex --project my-gcp-project --region us-east5
+claudock profile set-credit cloud 100.00
+claudock run cloud
+```
+
+For a Vertex launch, the Go CLI clears inherited per-model Vertex region, custom Vertex base URL, and skip-auth overrides; conflicting project or region values in the account config are rejected. Choose a region supported by the model. Project or managed Claude settings can still override launch settings.
+
+The budget is a local estimate; it is not a Google Cloud billing balance, quota, or enforced spending cap. The Go CLI currently reads and sets the shared ledger but **does not capture the cost of its own Console or Vertex launches**; it warns when launching either kind. Spending captured by the Swift app remains visible. On macOS, use `/Applications/Claudock.app/Contents/MacOS/claudock run cloud` when you need that app to capture the run. Use Google Cloud for authoritative billing and quota data.
 
 The token requirement shares `requireInferenceToken` in the app's
 `io.github.claudeusage.ClaudeUsage` preference domain. Production macOS builds
